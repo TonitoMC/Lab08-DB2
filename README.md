@@ -18,35 +18,36 @@ Requires a `.env` in the root with `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWOR
 
 ---
 
-## Neo4j queries (`queries.go`)
-
-All Cypher lives in `queries.go`. The functions below are what actually talk to the database.
+## Queries (`queries.go`)
 
 ### Creating nodes
 
-**Users**
+`CreateUser(name)`
 ```cypher
 CREATE (u:User {name: $name, userId: $userId}) RETURN u
 ```
 
-**Movies**
+`CreateMovie(title, year, plot)`
 ```cypher
 CREATE (m:Movie {title: $title, movieId: $movieId, year: $year, plot: $plot}) RETURN m
 ```
 
-**Actors, Directors, and Actor-Directors**
+`CreateActor(PersonInput)`
 ```cypher
-CREATE (a:Person:Actor { name: $name, tmdbId: $tmdbId, born: date($born), ... }) RETURN a
-CREATE (d:Person:Director { name: $name, tmdbId: $tmdbId, born: date($born), ... }) RETURN d
-CREATE (p:Person:Actor:Director { name: $name, tmdbId: $tmdbId, born: date($born), ... }) RETURN p
+CREATE (a:Person:Actor {name: $name, tmdbId: $tmdbId, born: date($born), bornIn: $bornIn, ...}) RETURN a
 ```
 
-**Genres** — uses `MERGE` so running it twice won't create duplicates
+`CreateDirector(PersonInput)`
 ```cypher
-MERGE (g:Genre {name: $name}) RETURN g
+CREATE (d:Person:Director {name: $name, tmdbId: $tmdbId, born: date($born), bornIn: $bornIn, ...}) RETURN d
 ```
 
-**Extended movies** — full schema with ratings, runtime, countries, etc.
+`CreateActorDirector(PersonInput)`
+```cypher
+CREATE (p:Person:Actor:Director {name: $name, tmdbId: $tmdbId, born: date($born), bornIn: $bornIn, ...}) RETURN p
+```
+
+`CreateExtMovie(ExtMovieInput)`
 ```cypher
 CREATE (m:Movie {
     title: $title, tmdbId: $tmdbId, released: date($released), imdbRating: $imdbRating,
@@ -55,32 +56,37 @@ CREATE (m:Movie {
 }) RETURN m
 ```
 
+`CreateGenre(name)`
+```cypher
+MERGE (g:Genre {name: $name}) RETURN g
+```
+
 ---
 
 ### Creating relationships
 
-**User rates a movie**
+`CreateRating(userID, movieID, rating, timestamp)`
 ```cypher
 MATCH (u:User {userId: $userId}), (m:Movie {movieId: $movieId})
 CREATE (u)-[r:RATED {rating: $rating, timestamp: $timestamp}]->(m)
 RETURN u.name AS userName, m.title AS movieTitle, r.rating AS rating, r.timestamp AS timestamp
 ```
 
-**Actor played a role in a movie**
+`CreateActedIn(actorTmdbID, movieID, role)`
 ```cypher
 MATCH (a:Person:Actor {tmdbId: $actorId}), (m:Movie {movieId: $movieId})
 CREATE (a)-[r:ACTED_IN {role: $role}]->(m)
 RETURN a.name AS actor, m.title AS movie, r.role AS role
 ```
 
-**Director directed a movie**
+`CreateDirected(directorTmdbID, movieID, role)`
 ```cypher
 MATCH (d:Person:Director {tmdbId: $directorId}), (m:Movie {movieId: $movieId})
 CREATE (d)-[r:DIRECTED {role: $role}]->(m)
 RETURN d.name AS director, m.title AS movie, r.role AS role
 ```
 
-**Movie belongs to a genre**
+`CreateInGenre(movieID, genreName)`
 ```cypher
 MATCH (m:Movie {movieId: $movieId}), (g:Genre {name: $genreName})
 CREATE (m)-[:IN_GENRE]->(g)
@@ -89,14 +95,14 @@ RETURN m.title AS movie, g.name AS genre
 
 ---
 
-### Finding things
+### Finding nodes and relationships
 
-**Find a user by name**
+`FindUserByName(name)`
 ```cypher
 MATCH (u:User {name: $name}) RETURN u
 ```
 
-**Find a user and everything they've rated**
+`FindUserWithRatingsByName(name)`
 ```cypher
 MATCH (u:User {name: $name})
 OPTIONAL MATCH (u)-[r:RATED]->(m:Movie)
@@ -104,13 +110,13 @@ RETURN u.name AS name, u.userId AS userId,
        collect({title: m.title, movieId: m.movieId, rating: r.rating, timestamp: r.timestamp}) AS ratings
 ```
 
-**Find a specific rating a user gave to a movie**
+`FindUserRatingForMovie(userName, movieTitle)`
 ```cypher
 MATCH (u:User {name: $name})-[r:RATED]->(m:Movie {title: $title})
 RETURN u.name AS userName, m.title AS movieTitle, r.rating AS rating, r.timestamp AS timestamp
 ```
 
-**Find a movie by title**
+`FindMovieByTitle(title)`
 ```cypher
 MATCH (m:Movie {title: $title}) RETURN m
 ```
